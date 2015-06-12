@@ -112,6 +112,7 @@ module type Client = sig
 
   val callv :
     ?ctx:ctx ->
+    ?depth:int ->
     Uri.t ->
     (Request.t * Cohttp_lwt_body.t) Lwt_stream.t ->
     (Response.t * Cohttp_lwt_body.t) Lwt_stream.t Lwt.t
@@ -203,35 +204,41 @@ module Make_client
     let body = Cohttp_lwt_body.of_string (Uri.encoded_of_query params) in
     post ?ctx ~chunked:false ~headers ~body uri
 
-  let callv ?(ctx=default_ctx) uri reqs =
+  let callv ?(ctx=default_ctx) ?(depth=10) uri reqs =
     Net.connect_uri ~ctx uri >>= fun (conn, ic, oc) ->
+    (* we don't know if server/proxy supports HTTP/1.1 yet *)
+    let pending, pending_push = Lwt_stream.create_bounded 1 in
+    let meth_stream, meth_push = Lwt_stream.create () in
     (* Serialise the requests out to the wire *)
-    Lwt_stream.fold_s (fun (req,body) meths ->
-      Request.write (fun writer ->
-        Cohttp_lwt_body.write_body (Request.write_body writer) body
-      ) req oc >>= fun () ->
-      return ((Request.meth req)::meths)
-    ) reqs [] >>= fun meths ->
+    Lwt_stream.on_terminate reqs (fun () -> meth_push None; pending_push#close);
+    ignore_result (Lwt_stream.iter_s (fun (req,body) ->
+        pending_push#push () >>= fun () ->
+        Request.write (fun writer ->
+            Cohttp_lwt_body.write_body (Request.write_body writer) body
+          ) req oc >|= fun () ->
+        meth_push (Some (Request.meth req));
+      ) reqs);
     (* Read the responses. For each response, ensure that the previous
        response has consumed the body before continuing to the next
        response because HTTP/1.1-pipelining cannot be interleaved. *)
-    let meth_stream = Lwt_stream.of_list (List.rev meths) in
     let read_m = Lwt_mutex.create () in
     let last_body = ref None in
-    let resps = Lwt_stream.from (fun () ->
-      let closefn () = Lwt_mutex.unlock read_m in
-      Lwt_stream.get meth_stream >>= function
-      | None -> return_none
-      | Some meth ->
-        begin match !last_body with None -> return_unit | Some body ->
-          Cohttp_lwt_body.drain_body body
+    let closefn () = Lwt_mutex.unlock read_m in
+    let resps = Lwt_stream.map_s (fun meth ->
+        begin match !last_body with
+          | None -> return_unit
+          | Some body -> Cohttp_lwt_body.drain_body body
         end >>= fun () ->
         Lwt_mutex.with_lock read_m (fun () -> read_response ~closefn ic oc meth)
-        >|= (fun ((_,body) as x) ->
+        >|= (fun ((resp,body) as x) ->
+          ignore_result (Lwt_stream.junk pending);
           last_body := Some body;
-          Some x
+          (* enable pipelining up to specified depth on HTTP/1.1 only *)
+         if Response.version resp = `HTTP_1_1 then
+            pending_push#resize (depth+1);
+          x
         )
-    ) in
+    ) meth_stream in
     Lwt_stream.on_terminate resps (fun () -> Net.close ic oc);
     return resps
 end

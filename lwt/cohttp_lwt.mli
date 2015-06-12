@@ -136,6 +136,7 @@ module type Client = sig
 
   val callv :
     ?ctx:ctx ->
+    ?depth:int ->
     Uri.t ->
     (Request.t * Cohttp_lwt_body.t) Lwt_stream.t ->
     (Response.t * Cohttp_lwt_body.t) Lwt_stream.t Lwt.t
