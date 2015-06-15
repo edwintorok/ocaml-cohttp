@@ -226,7 +226,8 @@ module Make_client
         begin match !last_body with None -> return_unit | Some body ->
           Cohttp_lwt_body.drain_body body
         end >>= fun () ->
-        Lwt_mutex.with_lock read_m (fun () -> read_response ~closefn ic oc meth)
+        Lwt_mutex.lock read_m >>= fun () ->
+        read_response ~closefn ic oc meth
         >|= (fun ((_,body) as x) ->
           last_body := Some body;
           Some x
