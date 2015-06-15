@@ -161,6 +161,10 @@ module Make_client
     | `DELETE -> false
     | _ -> true
 
+  let send_request oc req body =
+    Request.write (fun writer ->
+        Cohttp_lwt_body.write_body (Request.write_body writer) body) req oc
+
   let call ?(ctx=default_ctx) ?headers ?(body=`Empty) ?chunked meth uri =
     let headers = match headers with None -> Header.init () | Some h -> h in
     Net.connect_uri ~ctx uri >>= fun (conn, ic, oc) ->
@@ -169,8 +173,7 @@ module Make_client
     let sent = match chunked with
       | true ->
         let req = Request.make_for_client ~headers ~chunked meth uri in
-        Request.write (fun writer ->
-          Cohttp_lwt_body.write_body (Request.write_body writer) body) req oc
+        send_request oc req body
       | false ->
         (* If chunked is not allowed, then obtain the body length and
            insert header *)
@@ -178,8 +181,7 @@ module Make_client
         let req =
           Request.make_for_client ~headers ~chunked ~body_length meth uri
         in
-        Request.write (fun writer ->
-          Cohttp_lwt_body.write_body (Request.write_body writer) buf) req oc
+        send_request oc req buf
     in
     sent >>= fun () ->
     read_response ~closefn ic oc meth
@@ -207,9 +209,7 @@ module Make_client
     Net.connect_uri ~ctx uri >>= fun (conn, ic, oc) ->
     (* Serialise the requests out to the wire *)
     Lwt_stream.fold_s (fun (req,body) meths ->
-      Request.write (fun writer ->
-        Cohttp_lwt_body.write_body (Request.write_body writer) body
-      ) req oc >>= fun () ->
+      send_request oc req body >>= fun () ->
       return ((Request.meth req)::meths)
     ) reqs [] >>= fun meths ->
     (* Read the responses. For each response, ensure that the previous
