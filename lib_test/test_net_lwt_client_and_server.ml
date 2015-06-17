@@ -106,14 +106,14 @@ let client () =
   let body2 = body () in
   let meth = `POST in
   let encoding = Transfer.Chunked in
+  let to_string _resp body = Cohttp_lwt_body.to_string body in
   let reqs = Lwt_stream.of_list [
     Request.make ~meth ~encoding (Uri.of_string "/post"), body1;
     Request.make ~meth ~encoding ~headers:(Header.of_list ["connection","close"])
       (Uri.of_string "/post"), body2;
   ] in
-  lwt resp = Client.callv url reqs in
-  Lwt_stream.iter_s (fun (res, body) ->
-    lwt body = Cohttp_lwt_body.to_string body in
+  lwt resp = Client.callv url (Lwt_stream.map (fun r -> r, to_string) reqs) in
+  Lwt_stream.iter_s (fun body ->
     assert(body="foobar");
     return ()
   ) resp >>= fun () ->

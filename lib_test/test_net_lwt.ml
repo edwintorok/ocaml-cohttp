@@ -37,26 +37,29 @@ let make_net_reqv () =
       Request.make ~meth:`GET ~headers:last_header (Uri.of_string "/foo3"), `Empty;
     ] in
   let uri = Uri.of_string "http://5.153.225.51" in
-  lwt resp = Client.callv uri (Lwt_stream.of_list reqs) in
-  (* Consume the bodies, and we should get 3 responses *)
+  let of_list reqs fn =
+    Lwt_stream.of_list reqs |> Lwt_stream.map (fun r -> r, fn) in
   let num = ref 0 in
-  Lwt_stream.iter_s (fun (res,body) ->
+  let consume res body =
     (* Consume the body *)
     incr num;
     lwt _ = Cohttp_lwt_body.to_string body in
     assert_equal (Response.status res) `Not_found;
-    return ()
-  ) resp >>= fun () ->
+    return () in
+  lwt resp = Client.callv uri (of_list reqs consume) in
+  (* Consume the bodies, and we should get 3 responses *)
+  Lwt_stream.iter ignore resp >>= fun () ->
   assert_equal !num 3;
-  (* Run the callv without consuming bodies *)
-  lwt resp = Client.callv uri (Lwt_stream.of_list reqs) in
   let num = ref 0 in
-  Lwt_stream.iter_s (fun (res,body) ->
-    (* Do not consume the body *)
+  (* Run the callv without consuming bodies *)
+  let dont_consume res body =
+    (* Consume the body *)
     incr num;
+    lwt _ = Cohttp_lwt_body.to_string body in
     assert_equal (Response.status res) `Not_found;
-    return ()
-  ) resp >>= fun () ->
+    return () in
+  lwt resp = Client.callv uri (of_list reqs dont_consume) in
+  Lwt_stream.iter ignore resp >>= fun () ->
   assert_equal ~printer:string_of_int 3 !num;
   return ()
 

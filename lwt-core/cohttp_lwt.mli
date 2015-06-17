@@ -138,8 +138,8 @@ module type Client = sig
     ?ctx:ctx ->
     ?depth:int ->
     Uri.t ->
-    (Request.t * Cohttp_lwt_body.t) Lwt_stream.t ->
-    (Response.t * Cohttp_lwt_body.t) Lwt_stream.t Lwt.t
+    ((Request.t * Cohttp_lwt_body.t) * (Cohttp.Response.t -> Cohttp_lwt_body.t -> 'a Lwt.t)) Lwt_stream.t ->
+    'a Lwt_stream.t Lwt.t
 end
 
 (** The [Make_client] functor glues together a {! Cohttp.S.IO } implementation

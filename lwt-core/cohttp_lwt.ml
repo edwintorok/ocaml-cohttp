@@ -114,8 +114,8 @@ module type Client = sig
     ?ctx:ctx ->
     ?depth:int ->
     Uri.t ->
-    (Request.t * Cohttp_lwt_body.t) Lwt_stream.t ->
-    (Response.t * Cohttp_lwt_body.t) Lwt_stream.t Lwt.t
+    ((Request.t * Cohttp_lwt_body.t) * (Cohttp.Response.t -> Cohttp_lwt_body.t -> 'a Lwt.t)) Lwt_stream.t ->
+    'a Lwt_stream.t Lwt.t
 end
 
 module Make_client
@@ -219,35 +219,25 @@ module Make_client
     let pipeline_recv, pipeline_send = Lwt_stream.create_bounded 1 in
     (* Serialise the requests out to the wire *)
     let meth_stream, meth_push = Lwt_stream.create () in
-    ignore_result (Lwt_stream.iter_s (fun (req,body) ->
+    ignore_result (Lwt_stream.iter_s (fun ((req,body), fn) ->
         set_pipeline pipeline_send req body >>= fun () ->
         pipeline_send#push () >>= fun () ->
         send_request oc req body >|= fun () ->
-        meth_push (Some (Request.meth req))) reqs);
+        meth_push (Some (Request.meth req, fn))) reqs);
     Lwt_stream.on_terminate reqs (fun () -> meth_push None; pipeline_send#close);
     (* Read the responses. For each response, ensure that the previous
        response has consumed the body before continuing to the next
        response because HTTP/1.1-pipelining cannot be interleaved. *)
-    let read_m = Lwt_mutex.create () in
-    let last_body = ref None in
-    let closefn () =
-      Lwt_mutex.unlock read_m;
-      (* allow more requests to be sent *)
-      ignore_result (Lwt_stream.junk pipeline_recv)
-    in
-    let resps = Lwt_stream.map_s (fun meth ->
-        begin match !last_body with None -> return_unit | Some body ->
-          Cohttp_lwt_body.drain_body body
-        end >>= fun () ->
-        Lwt_mutex.lock read_m >>= fun () ->
-        read_response ~closefn ic oc meth
-        >|= (fun ((resp,body) as x) ->
-            (* enable pipelining up to specified depth on HTTP/1.1 only *)
+    let resps = Lwt_stream.map_s (fun (meth, fn) ->
+        read_response ic oc meth >>= (fun (resp, body) ->
             if Response.version resp = `HTTP_1_1 then
               pipeline_send#resize (depth+1);
-            last_body := Some body;
-            x
-          )
+            Lwt.finalize (fun () -> fn resp body) (fun () ->
+                Cohttp_lwt_body.drain_body body >|= fun () ->
+                (* allow more requests to be sent *)
+                ignore_result (Lwt_stream.junk pipeline_recv);
+                (* enable pipelining up to specified depth on HTTP/1.1 only *)
+              ))
       ) meth_stream in
     Lwt_stream.on_terminate resps (fun () -> pipeline_send#close; Net.close ic oc);
     return resps
