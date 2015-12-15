@@ -73,6 +73,9 @@ val get : t -> string -> string option
 (** Retrieve all of the values associated with a key *)
 val get_multi : t -> string -> string list
 
+(** Retrieve all of the (comma-separated) list values associated with a key *)
+val get_all : t -> string -> string list
+
 val iter : (string -> string list -> unit) -> t -> unit
 val map : (string -> string list -> string list) -> t -> t
 val fold : (string -> string -> 'a -> 'a) -> t -> 'a -> 'a

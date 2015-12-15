@@ -98,9 +98,21 @@ let add_opt_unless_exists h k v =
   | None -> init_with k v
   | Some h -> add_unless_exists h k v
 
+let get_list h k =
+  try StringMap.find k h with Not_found -> []
+
 let get_multi h k =
   let k = LString.of_string k in
-  try StringMap.find k h with Not_found -> []
+  get_list h k
+
+let fold_split accum v =
+  List.rev_append (Stringext.split v ~on:',' |> List.rev_map String.trim) accum
+
+let get_all h k =
+  let k = LString.of_string k in
+  if not (is_header_with_list_value k) then
+    invalid_arg (LString.to_string k);
+  List.fold_left fold_split [] (get_list h k)
 
 let map fn h = StringMap.mapi (fun k v -> fn (LString.to_string k) v)  h
 let iter fn h = ignore(map fn h)
