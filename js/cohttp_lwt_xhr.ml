@@ -99,7 +99,7 @@ module Make_api(X : sig
 
   (* No implementation (can it be done?).  What should the failure exception be? *)
   exception Cohttp_lwt_xhr_callv_not_implemented
-  let callv ?ctx uri reqs = Lwt.fail Cohttp_lwt_xhr_callv_not_implemented (* ??? *)
+  let callv ?ctx ?flush uri reqs = Lwt.fail Cohttp_lwt_xhr_callv_not_implemented (* ??? *)
 
 end
 

@@ -132,11 +132,11 @@ module Make_client
     let body = Body.of_string (Uri.encoded_of_query params) in
     post ?ctx ~chunked:false ~headers ~body uri
 
-  let callv ?(ctx=default_ctx) uri reqs =
+  let callv ?(ctx=default_ctx) ?flush uri reqs =
     Net.connect_uri ~ctx uri >>= fun (conn, ic, oc) ->
     (* Serialise the requests out to the wire *)
     let meth_stream = Lwt_stream.map_s (fun (req,body) ->
-      Request.write (fun writer ->
+      Request.write ?flush (fun writer ->
         Body.write_body (Request.write_body writer) body
       ) req oc >>= fun () ->
       return (Request.meth req)

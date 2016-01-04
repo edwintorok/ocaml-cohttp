@@ -96,6 +96,7 @@ module type Client = sig
 
   val callv :
     ?ctx:ctx ->
+    ?flush:bool ->
     Uri.t ->
     (Request.t * Cohttp_lwt_body.t) Lwt_stream.t ->
     (Response.t * Cohttp_lwt_body.t) Lwt_stream.t Lwt.t
