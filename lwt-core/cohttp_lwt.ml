@@ -294,10 +294,14 @@ module Make_server(IO:IO) = struct
     Lwt_stream.on_terminate res_stream conn_closed;
     (* Transmit the responses *)
     res_stream |> Lwt_stream.iter_s (fun (res,body) ->
-      let flush = Response.flush res in
+      let do_close = Response.headers res |> Header.connection = Some `Close in
+      let flush = Response.flush res || do_close in
       Response.write ~flush (fun writer ->
         Body.write_body (Response.write_body writer) body
-      ) res oc
+      ) res oc >>= fun () ->
+      if do_close then
+        Lwt.fail Lwt.Canceled
+      else Lwt.return_unit
     )
 end
 
