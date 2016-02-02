@@ -83,8 +83,15 @@ module Server = struct
         respond_not_found ()
       | exn -> Lwt.fail exn)
 
+  let after sec =
+    let t, u = Lwt.task () in
+    let tmo = Lwt_timeout.create sec (fun () -> Lwt.wakeup u ()) in
+    Lwt.on_cancel t (fun () -> Lwt_timeout.stop tmo);
+    Lwt_timeout.start tmo;
+    t
+
   let create ?timeout ?stop ?(ctx=Cohttp_lwt_unix_net.default_ctx)
         ?(mode=`TCP (`Port 8080)) spec =
     Conduit_lwt_unix.serve ?timeout ?stop ~ctx:ctx.Cohttp_lwt_unix_net.ctx
-      ~mode (callback spec)
+      ~mode (callback ~after spec)
 end

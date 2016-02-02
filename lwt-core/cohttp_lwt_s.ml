@@ -110,7 +110,17 @@ module type Server = sig
 
   type t
 
+  (** [make ?conn_closed ?header_timeout ?body_read_timeout ?keepalive_header_timeout callback ()]
+      [conn_closed] is a function invoked when the (possibly persistent) connection is closed
+      [header_timeout] timeout to read the entire request line and headers
+      [body_read_timeout] timeout for reading one body chunk
+      [keepalive_header_timeout] timeout to read next request line and headers on a persistent connection
+      [callback] is the function that handles the request
+     *)
   val make : ?conn_closed:(conn -> unit)
+    -> ?header_timeout:int
+    -> ?body_read_timeout:int
+    -> ?keepalive_header_timeout:int
     -> callback:(conn -> Cohttp.Request.t -> Cohttp_lwt_body.t
                  -> (Cohttp.Response.t * Cohttp_lwt_body.t) Lwt.t)
     -> unit -> t
@@ -153,6 +163,6 @@ module type Server = sig
   val respond_not_found :
     ?uri:Uri.t -> unit -> (Response.t * Cohttp_lwt_body.t) Lwt.t
 
-  val callback : t -> IO.conn -> IO.ic -> IO.oc -> unit Lwt.t
+  val callback : ?after:(int -> unit Lwt.t) -> t -> IO.conn -> IO.ic -> IO.oc -> unit Lwt.t
 
 end

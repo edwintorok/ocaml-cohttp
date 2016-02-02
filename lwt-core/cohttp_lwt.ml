@@ -40,6 +40,8 @@ end
 module Request = Cohttp.Request
 module Response = Cohttp.Response
 
+exception Timeout
+
 module Make_client
     (IO:IO)
     (Net:Cohttp_lwt_s.Net with module IO = IO) = struct
@@ -177,10 +179,23 @@ module Make_server(IO:IO) = struct
       Body.t ->
       (Cohttp.Response.t * Body.t) Lwt.t;
     conn_closed: conn -> unit;
+    header_timeout: int option;
+    body_read_timeout : int option;
+    keepalive_header_timeout : int option;
+    after : int -> unit Lwt.t;
   }
 
-  let make ?(conn_closed=ignore) ~callback () =
-    { conn_closed ; callback }
+  let after_default _ = fst (Lwt.task ())
+
+  let with_timeout spec timeout t =
+    match timeout with
+    | None -> t
+    | Some timeout ->
+      let timeout = spec.after timeout >>= fun () -> Lwt.fail Timeout in
+      Lwt.pick [t; timeout ]
+
+  let make ?(conn_closed=ignore) ?header_timeout ?body_read_timeout ?keepalive_header_timeout ~callback () =
+    { conn_closed ; callback; after = after_default; header_timeout; body_read_timeout; keepalive_header_timeout }
 
   module Transfer_IO = Transfer_io.Make(IO)
 
@@ -230,19 +245,22 @@ module Make_server(IO:IO) = struct
       |Some uri -> "Not found: " ^ (Uri.to_string uri) in
     respond_string ~status:`Not_found ~body ()
 
-  let request_stream ic =
+  let request_stream spec ic =
     (* don't try to read more from ic until the previous request has
        been fully read an released this mutex *)
     let read_m = Lwt_mutex.create () in
     (* If the request is HTTP version 1.0 then the request stream should be
        considered closed after the first request/response. *)
     let early_close = ref false in
+    let first = ref true in
     Lwt_stream.from begin fun () ->
       if !early_close
       then return_none
       else
         Lwt_mutex.lock read_m >>= fun () ->
-        Request.read ic >>= function
+        let timeout = if !first then spec.header_timeout else spec.keepalive_header_timeout in
+        first := false;
+        with_timeout spec timeout (Request.read ic) >>= function
         | `Eof | `Invalid _ -> (* TODO: request logger for invalid req *)
           Lwt_mutex.unlock read_m;
           return_none
@@ -253,8 +271,10 @@ module Make_server(IO:IO) = struct
             match Request.has_body req with
             | `Yes ->
               let reader = Request.make_body_reader req ic in
+              let read_with_timeout arg =
+                with_timeout spec spec.body_read_timeout (Request.read_body_chunk arg) in
               let body_stream = Body.create_stream
-                                  Request.read_body_chunk reader in
+                                   read_with_timeout reader in
               Lwt_stream.on_terminate body_stream
                 (fun () -> Lwt_mutex.unlock read_m);
               let body = Body.of_stream body_stream in
@@ -281,13 +301,14 @@ module Make_server(IO:IO) = struct
         (fun () -> Body.drain_body body)
     ) req_stream
 
-  let callback spec io_id ic oc =
+  let callback ?(after=after_default) spec io_id ic oc =
+    let spec = { spec with after } in
     let conn_id = Connection.create () in
     let conn_closed () = spec.conn_closed (io_id,conn_id) in
     (* The server operates by reading requests into a Lwt_stream of requests
        and mapping them into a stream of responses serially using [spec]. The
        responses are then sent over the wire *)
-    let req_stream = request_stream ic in
+    let req_stream = request_stream spec ic in
     let res_stream = response_stream spec.callback io_id conn_id req_stream in
     (* Clean up resources when the response stream terminates and call
      * the user callback *)

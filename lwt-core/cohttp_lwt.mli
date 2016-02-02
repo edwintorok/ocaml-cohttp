@@ -37,6 +37,8 @@ open Cohttp_lwt_s
 module Request : (Cohttp.S.Request with type t = Cohttp.Request.t)
 module Response : (Cohttp.S.Response with type t = Cohttp.Response.t)
 
+exception Timeout
+
 (** The [Make_client] functor glues together a {! Cohttp.S.IO } implementation
     to send requests down a connection that is established by the  {! Net }
     module.  The resulting module satisfies the {! Client } module type. *)
