@@ -264,6 +264,15 @@ Executable test_net_lwt_multi_get
   Install:            false
   BuildDepends:       cohttp, cohttp.lwt
 
+Executable test_net_lwt_limits
+  Path:               lib_test
+  MainIs:             test_net_lwt_limits.ml
+  Build$:             flag(tests) && flag(lwt_unix)
+  Custom:             true
+  CompiledObject:     best
+  Install:            false
+  BuildDepends:       cohttp, cohttp.lwt
+
 Executable test_net_lwt_client_and_server
   Path:               lib_test
   MainIs:             test_net_lwt_client_and_server.ml

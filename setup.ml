@@ -8085,6 +8085,43 @@ let setup_t =
                    });
                Executable
                  ({
+                     cs_name = "test_net_lwt_limits";
+                     cs_data = PropList.Data.create ();
+                     cs_plugin_data = []
+                  },
+                   {
+                      bs_build =
+                        [
+                           (OASISExpr.EBool true, false);
+                           (OASISExpr.EAnd
+                              (OASISExpr.EFlag "tests",
+                                OASISExpr.EFlag "lwt_unix"),
+                             true)
+                        ];
+                      bs_install = [(OASISExpr.EBool true, false)];
+                      bs_path = "lib_test";
+                      bs_compiled_object = Best;
+                      bs_build_depends =
+                        [
+                           InternalLibrary "cohttp";
+                           InternalLibrary "cohttp_lwt_unix"
+                        ];
+                      bs_build_tools = [ExternalTool "ocamlbuild"];
+                      bs_c_sources = [];
+                      bs_data_files = [];
+                      bs_ccopt = [(OASISExpr.EBool true, [])];
+                      bs_cclib = [(OASISExpr.EBool true, [])];
+                      bs_dlllib = [(OASISExpr.EBool true, [])];
+                      bs_dllpath = [(OASISExpr.EBool true, [])];
+                      bs_byteopt = [(OASISExpr.EBool true, [])];
+                      bs_nativeopt = [(OASISExpr.EBool true, [])]
+                   },
+                   {
+                      exec_custom = true;
+                      exec_main_is = "test_net_lwt_limits.ml"
+                   });
+               Executable
+                 ({
                      cs_name = "test_net_lwt_client_and_server";
                      cs_data = PropList.Data.create ();
                      cs_plugin_data = []

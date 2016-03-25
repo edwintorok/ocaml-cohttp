@@ -303,6 +303,26 @@ true: annot, bin_annot
 <lib_test/test_net_lwt_multi_get.{native,byte}>: use_cohttp_lwt
 <lib_test/test_net_lwt_multi_get.{native,byte}>: use_cohttp_lwt_unix
 <lib_test/test_net_lwt_multi_get.{native,byte}>: custom
+# Executable test_net_lwt_limits
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_base64
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_bytes
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_conduit.lwt-unix
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_fieldslib
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_fieldslib.syntax
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_lwt
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_lwt.unix
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_magic-mime
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_re.emacs
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_sexplib
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_sexplib.syntax
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_stringext
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_unix
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_uri
+<lib_test/test_net_lwt_limits.{native,byte}>: pkg_uri.services
+<lib_test/test_net_lwt_limits.{native,byte}>: use_cohttp
+<lib_test/test_net_lwt_limits.{native,byte}>: use_cohttp_lwt
+<lib_test/test_net_lwt_limits.{native,byte}>: use_cohttp_lwt_unix
+<lib_test/test_net_lwt_limits.{native,byte}>: custom
 # Executable test_net_lwt_client_and_server
 <lib_test/test_net_lwt_client_and_server.{native,byte}>: pkg_base64
 <lib_test/test_net_lwt_client_and_server.{native,byte}>: pkg_bytes
